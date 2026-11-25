@@ -55,115 +55,116 @@ class McpSettingsSection extends StatelessWidget {
     final pathsCtrl = TextEditingController();
     var tier = McpPermissionTier.discover;
     var policy = McpExecutionPolicy.ask;
+    var allowAll = false;
 
-    final created = await showDialog<
-        (String, McpPermissionTier, McpExecutionPolicy, List<String>)?>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: const Text('New agent token'),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Token name',
-                    hintText: 'e.g. Claude Desktop, Cursor, CI Bot',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<McpPermissionTier>(
-                  initialValue: tier,
-                  decoration: const InputDecoration(
-                    labelText: 'Permission tier',
-                  ),
-                  items: [
-                    for (final t in McpPermissionTier.values)
-                      DropdownMenuItem(value: t, child: Text(t.label)),
+    final created =
+        await showDialog<
+          (String, McpPermissionTier, McpExecutionPolicy, List<String>, bool)?
+        >(
+          context: context,
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, setState) => AlertDialog(
+              title: const Text('New agent token'),
+              content: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Token name',
+                        hintText: 'e.g. Claude Desktop, Cursor, CI Bot',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<McpPermissionTier>(
+                      initialValue: tier,
+                      decoration: const InputDecoration(
+                        labelText: 'Permission tier',
+                      ),
+                      items: [
+                        for (final t in McpPermissionTier.values)
+                          DropdownMenuItem(value: t, child: Text(t.label)),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setState(() => tier = v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _LocalFoldersField(
+                      controller: pathsCtrl,
+                      allowAll: allowAll,
+                      onAllowAll: (v) => setState(() => allowAll = v),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Execution level',
+                      style: Theme.of(ctx).textTheme.labelMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    SegmentedButton<McpExecutionPolicy>(
+                      segments: const [
+                        ButtonSegment(
+                          value: McpExecutionPolicy.deny,
+                          label: Text('Deny'),
+                        ),
+                        ButtonSegment(
+                          value: McpExecutionPolicy.ask,
+                          label: Text('Ask'),
+                        ),
+                        ButtonSegment(
+                          value: McpExecutionPolicy.autoApprove,
+                          label: Text('Auto approve'),
+                        ),
+                      ],
+                      selected: {policy},
+                      onSelectionChanged: (s) =>
+                          setState(() => policy = s.first),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      switch (policy) {
+                        McpExecutionPolicy.deny =>
+                          'Blocks ssh_exec, SFTP, and vault write operations.',
+                        McpExecutionPolicy.ask =>
+                          'Prompts you to approve each execution or write.',
+                        McpExecutionPolicy.autoApprove =>
+                          'Warning: runs allowed tools automatically without prompting.',
+                      },
+                      style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: policy == McpExecutionPolicy.autoApprove
+                            ? Theme.of(ctx).colorScheme.error
+                            : Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => tier = v);
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final paths = _splitPaths(pathsCtrl.text);
+                    Navigator.pop(ctx, (
+                      nameCtrl.text,
+                      tier,
+                      policy,
+                      paths,
+                      allowAll,
+                    ));
                   },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: pathsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Allowed local folders for sftp_sync (optional)',
-                    hintText: '/Users/you/Projects, /tmp/deploy',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Execution level',
-                  style: Theme.of(ctx).textTheme.labelMedium,
-                ),
-                const SizedBox(height: 6),
-                SegmentedButton<McpExecutionPolicy>(
-                  segments: const [
-                    ButtonSegment(
-                      value: McpExecutionPolicy.deny,
-                      label: Text('Deny'),
-                    ),
-                    ButtonSegment(
-                      value: McpExecutionPolicy.ask,
-                      label: Text('Ask'),
-                    ),
-                    ButtonSegment(
-                      value: McpExecutionPolicy.autoApprove,
-                      label: Text('Auto approve'),
-                    ),
-                  ],
-                  selected: {policy},
-                  onSelectionChanged: (s) => setState(() => policy = s.first),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  switch (policy) {
-                    McpExecutionPolicy.deny =>
-                      'Blocks ssh_exec, SFTP, and vault write operations.',
-                    McpExecutionPolicy.ask =>
-                      'Prompts you to approve each execution or write.',
-                    McpExecutionPolicy.autoApprove =>
-                      'Warning: runs allowed tools automatically without prompting.',
-                  },
-                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                    color: policy == McpExecutionPolicy.autoApprove
-                        ? Theme.of(ctx).colorScheme.error
-                        : Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
+                  child: const Text('Create'),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final paths = pathsCtrl.text
-                    .split(',')
-                    .map((s) => s.trim())
-                    .where((s) => s.isNotEmpty)
-                    .toList();
-                Navigator.pop(
-                  ctx,
-                  (nameCtrl.text, tier, policy, paths),
-                );
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        ),
-      ),
-    );
+        );
     nameCtrl.dispose();
     pathsCtrl.dispose();
     if (created == null || !context.mounted) return;
@@ -173,6 +174,7 @@ class McpSettingsSection extends StatelessWidget {
       tier: created.$2,
       executionPolicy: created.$3,
       allowedLocalPaths: created.$4,
+      allowAllLocalPaths: created.$5,
     );
     if (!context.mounted) return;
 
@@ -224,88 +226,111 @@ class McpSettingsSection extends StatelessWidget {
 
   Future<void> _editToken(BuildContext context, McpAgentToken token) async {
     final nameCtrl = TextEditingController(text: token.name);
+    final pathsCtrl = TextEditingController(
+      text: token.allowedLocalPaths.join(', '),
+    );
     var tier = token.tier;
     var policy = token.executionPolicy;
+    var allowAll = token.allowAllLocalPaths;
 
     final updated =
-        await showDialog<(String, McpPermissionTier, McpExecutionPolicy)?>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: Text('Edit "${token.name}"'),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Token name'),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<McpPermissionTier>(
-                  initialValue: tier,
-                  decoration: const InputDecoration(
-                    labelText: 'Permission tier',
-                  ),
-                  items: [
-                    for (final t in McpPermissionTier.values)
-                      DropdownMenuItem(value: t, child: Text(t.label)),
+        await showDialog<
+          (String, McpPermissionTier, McpExecutionPolicy, List<String>, bool)?
+        >(
+          context: context,
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, setState) => AlertDialog(
+              title: Text('Edit "${token.name}"'),
+              content: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Token name',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<McpPermissionTier>(
+                      initialValue: tier,
+                      decoration: const InputDecoration(
+                        labelText: 'Permission tier',
+                      ),
+                      items: [
+                        for (final t in McpPermissionTier.values)
+                          DropdownMenuItem(value: t, child: Text(t.label)),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setState(() => tier = v);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Execution level',
+                      style: Theme.of(ctx).textTheme.labelMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    SegmentedButton<McpExecutionPolicy>(
+                      segments: const [
+                        ButtonSegment(
+                          value: McpExecutionPolicy.deny,
+                          label: Text('Deny'),
+                        ),
+                        ButtonSegment(
+                          value: McpExecutionPolicy.ask,
+                          label: Text('Ask'),
+                        ),
+                        ButtonSegment(
+                          value: McpExecutionPolicy.autoApprove,
+                          label: Text('Auto approve'),
+                        ),
+                      ],
+                      selected: {policy},
+                      onSelectionChanged: (s) =>
+                          setState(() => policy = s.first),
+                    ),
+                    const SizedBox(height: 16),
+                    _LocalFoldersField(
+                      controller: pathsCtrl,
+                      allowAll: allowAll,
+                      onAllowAll: (v) => setState(() => allowAll = v),
+                    ),
                   ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => tier = v);
-                  },
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Execution level',
-                  style: Theme.of(ctx).textTheme.labelMedium,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
                 ),
-                const SizedBox(height: 6),
-                SegmentedButton<McpExecutionPolicy>(
-                  segments: const [
-                    ButtonSegment(
-                      value: McpExecutionPolicy.deny,
-                      label: Text('Deny'),
-                    ),
-                    ButtonSegment(
-                      value: McpExecutionPolicy.ask,
-                      label: Text('Ask'),
-                    ),
-                    ButtonSegment(
-                      value: McpExecutionPolicy.autoApprove,
-                      label: Text('Auto approve'),
-                    ),
-                  ],
-                  selected: {policy},
-                  onSelectionChanged: (s) => setState(() => policy = s.first),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, (
+                    nameCtrl.text,
+                    tier,
+                    policy,
+                    _splitPaths(pathsCtrl.text),
+                    allowAll,
+                  )),
+                  child: const Text('Save'),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, (nameCtrl.text, tier, policy)),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
+        );
     nameCtrl.dispose();
+    pathsCtrl.dispose();
     if (updated == null) return;
     await mcpService.tokenStore.updateToken(
       token.id,
       name: updated.$1,
       tier: updated.$2,
       executionPolicy: updated.$3,
+      allowedLocalPaths: updated.$4,
+      allowAllLocalPaths: updated.$5,
     );
   }
 
@@ -367,9 +392,7 @@ class McpSettingsSection extends StatelessWidget {
                     ExpansionTile(
                       initiallyExpanded: true,
                       title: Text('${g.key} (${g.value.length})'),
-                      children: [
-                        for (final e in g.value) buildTile(e),
-                      ],
+                      children: [for (final e in g.value) buildTile(e)],
                     ),
                 ],
               );
@@ -431,7 +454,9 @@ class McpSettingsSection extends StatelessWidget {
         children: [
           Text(
             title,
-            style: t.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+            style: t.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
           ),
           if (detail != null)
             Padding(
@@ -473,7 +498,7 @@ class McpSettingsSection extends StatelessWidget {
             ? 'Error: ${mcpService.lastError}'
             : mcpService.isRunning
             ? 'Listening on http://127.0.0.1:${mcpService.port}/mcp'
-                '${activeReq > 0 ? ' ($activeReq active)' : ''}'
+                  '${activeReq > 0 ? ' ($activeReq active)' : ''}'
             : 'Off. Enable to let authorized local AI agents connect.';
 
         return Column(
@@ -547,7 +572,8 @@ class McpSettingsSection extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           OutlinedButton(
-                            onPressed: () => mcpService.tokenStore.revoke(tk.id),
+                            onPressed: () =>
+                                mcpService.tokenStore.revoke(tk.id),
                             child: const Text('Revoke'),
                           ),
                         ],
@@ -569,6 +595,58 @@ class McpSettingsSection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+List<String> _splitPaths(String text) =>
+    text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+
+/// The "which local folders may sftp_sync use" part of the token dialogs: a
+/// switch for every folder, or a list of folders.
+class _LocalFoldersField extends StatelessWidget {
+  const _LocalFoldersField({
+    required this.controller,
+    required this.allowAll,
+    required this.onAllowAll,
+  });
+
+  final TextEditingController controller;
+  final bool allowAll;
+  final ValueChanged<bool> onAllowAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Allow all local folders for sftp_sync'),
+          subtitle: Text(
+            allowAll
+                ? 'Any folder on this computer can be uploaded or filled. '
+                      '.ssh, /etc and /System stay blocked.'
+                : 'Off: only the folders listed below.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: allowAll
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          value: allowAll,
+          onChanged: onAllowAll,
+        ),
+        TextField(
+          controller: controller,
+          enabled: !allowAll,
+          decoration: const InputDecoration(
+            labelText: 'Allowed local folders for sftp_sync',
+            hintText: '/Users/you/Projects, /tmp/deploy',
+          ),
+        ),
+      ],
     );
   }
 }

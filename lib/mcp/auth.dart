@@ -56,6 +56,7 @@ class McpAgentToken {
     this.allowedHostIds = const [],
     this.allowedGroups = const [],
     this.allowedLocalPaths = const [],
+    this.allowAllLocalPaths = false,
     McpExecutionPolicy? executionPolicy,
     bool? requireApproval,
     required this.createdAt,
@@ -87,12 +88,13 @@ class McpAgentToken {
         (t) => t.name == j['tier'],
         orElse: () => McpPermissionTier.discover,
       ),
-      allowedVaultIds:
-          (j['allowedVaultIds'] as List? ?? const []).cast<String>(),
+      allowedVaultIds: (j['allowedVaultIds'] as List? ?? const [])
+          .cast<String>(),
       allowedHostIds: (j['allowedHostIds'] as List? ?? const []).cast<String>(),
       allowedGroups: (j['allowedGroups'] as List? ?? const []).cast<String>(),
-      allowedLocalPaths:
-          (j['allowedLocalPaths'] as List? ?? const []).cast<String>(),
+      allowedLocalPaths: (j['allowedLocalPaths'] as List? ?? const [])
+          .cast<String>(),
+      allowAllLocalPaths: j['allowAllLocalPaths'] as bool? ?? false,
       executionPolicy: policy,
       createdAt: j['createdAt'] as int? ?? 0,
       revokedAt: j['revokedAt'] as int?,
@@ -107,13 +109,18 @@ class McpAgentToken {
   List<String> allowedHostIds;
   List<String> allowedGroups;
   List<String> allowedLocalPaths;
+
+  /// Lets this token use any local folder with sftp_sync, instead of only
+  /// [allowedLocalPaths]. Sensitive folders stay blocked.
+  bool allowAllLocalPaths;
   McpExecutionPolicy executionPolicy;
   final int createdAt;
   int? revokedAt;
 
   bool get requireApproval => executionPolicy == McpExecutionPolicy.ask;
-  set requireApproval(bool value) => executionPolicy =
-      value ? McpExecutionPolicy.ask : McpExecutionPolicy.autoApprove;
+  set requireApproval(bool value) => executionPolicy = value
+      ? McpExecutionPolicy.ask
+      : McpExecutionPolicy.autoApprove;
 
   bool get isRevoked => revokedAt != null;
 
@@ -126,6 +133,7 @@ class McpAgentToken {
     'allowedHostIds': allowedHostIds,
     'allowedGroups': allowedGroups,
     'allowedLocalPaths': allowedLocalPaths,
+    'allowAllLocalPaths': allowAllLocalPaths,
     'executionPolicy': executionPolicy.name,
     'requireApproval': requireApproval,
     'createdAt': createdAt,
@@ -193,6 +201,7 @@ class McpTokenStore extends ChangeNotifier {
     List<String> allowedHostIds = const [],
     List<String> allowedGroups = const [],
     List<String> allowedLocalPaths = const [],
+    bool allowAllLocalPaths = false,
     McpExecutionPolicy? executionPolicy,
     bool? requireApproval,
   }) async {
@@ -206,6 +215,7 @@ class McpTokenStore extends ChangeNotifier {
       allowedHostIds: List.unmodifiable(allowedHostIds),
       allowedGroups: List.unmodifiable(allowedGroups),
       allowedLocalPaths: List.unmodifiable(allowedLocalPaths),
+      allowAllLocalPaths: allowAllLocalPaths,
       executionPolicy: executionPolicy,
       requireApproval: requireApproval,
       createdAt: DateTime.now().millisecondsSinceEpoch,
@@ -263,6 +273,8 @@ class McpTokenStore extends ChangeNotifier {
     String? name,
     McpPermissionTier? tier,
     McpExecutionPolicy? executionPolicy,
+    List<String>? allowedLocalPaths,
+    bool? allowAllLocalPaths,
   }) async {
     final idx = tokens.indexWhere((t) => t.id == id);
     if (idx < 0) return;
@@ -275,6 +287,12 @@ class McpTokenStore extends ChangeNotifier {
     }
     if (executionPolicy != null) {
       tk.executionPolicy = executionPolicy;
+    }
+    if (allowedLocalPaths != null) {
+      tk.allowedLocalPaths = List.unmodifiable(allowedLocalPaths);
+    }
+    if (allowAllLocalPaths != null) {
+      tk.allowAllLocalPaths = allowAllLocalPaths;
     }
     await _save();
     notifyListeners();
@@ -298,10 +316,13 @@ class McpTokenStore extends ChangeNotifier {
     return true;
   }
 
-  /// Checks whether [localPath] is inside one of [token.allowedLocalPaths] and
-  /// is not a sensitive system or SSH credential directory.
+  /// Checks whether [localPath] is inside one of [token.allowedLocalPaths] (or
+  /// anywhere, when [token.allowAllLocalPaths] is set) and is not a sensitive
+  /// system or SSH credential directory.
   bool isLocalPathAllowed(McpAgentToken token, String localPath) {
-    if (token.allowedLocalPaths.isEmpty) return false;
+    if (!token.allowAllLocalPaths && token.allowedLocalPaths.isEmpty) {
+      return false;
+    }
     final normTarget = _normalizePath(localPath);
     if (normTarget.isEmpty) return false;
 
@@ -313,6 +334,8 @@ class McpTokenStore extends ChangeNotifier {
         normTarget.startsWith('/System/')) {
       return false;
     }
+
+    if (token.allowAllLocalPaths) return true;
 
     for (final rawRoot in token.allowedLocalPaths) {
       final normRoot = _normalizePath(rawRoot);

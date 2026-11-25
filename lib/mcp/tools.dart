@@ -13,18 +13,16 @@ import 'auth.dart';
 import 'executions.dart';
 import 'prompter.dart';
 
-typedef SshConnectorFn = Future<Connection> Function(
-  VaultSession vault,
-  Host host,
-  Prompter ui,
-);
+typedef SshConnectorFn =
+    Future<Connection> Function(VaultSession vault, Host host, Prompter ui);
 
-typedef AgentTerminalOpenerFn = TerminalTab Function(
-  VaultSession vault,
-  Host host, {
-  String? agentName,
-  bool newSession,
-});
+typedef AgentTerminalOpenerFn =
+    TerminalTab Function(
+      VaultSession vault,
+      Host host, {
+      String? agentName,
+      bool newSession,
+    });
 
 class McpToolError implements Exception {
   McpToolError(this.code, this.message);
@@ -120,17 +118,26 @@ class McpToolRegistry {
       description:
           'List saved identities from unlocked vaults (metadata only; secrets are stripped).',
       tier: McpPermissionTier.discover,
-      inputSchema: {'type': 'object', 'properties': {}, 'additionalProperties': false},
+      inputSchema: {
+        'type': 'object',
+        'properties': {},
+        'additionalProperties': false,
+      },
     ),
     _ToolSpec(
       name: 'list_snippets',
       description: 'List saved command snippets from unlocked vaults.',
       tier: McpPermissionTier.discover,
-      inputSchema: {'type': 'object', 'properties': {}, 'additionalProperties': false},
+      inputSchema: {
+        'type': 'object',
+        'properties': {},
+        'additionalProperties': false,
+      },
     ),
     _ToolSpec(
       name: 'create_snippet',
-      description: 'Create and save a reusable command snippet in an unlocked vault.',
+      description:
+          'Create and save a reusable command snippet in an unlocked vault.',
       tier: McpPermissionTier.sftpWrite,
       inputSchema: {
         'type': 'object',
@@ -139,7 +146,8 @@ class McpToolRegistry {
           'command': {'type': 'string', 'description': 'Shell command text'},
           'vaultId': {
             'type': 'string',
-            'description': 'Target vault UUID (optional if only one allowed vault is unlocked)',
+            'description':
+                'Target vault UUID (optional if only one allowed vault is unlocked)',
           },
         },
         'required': ['label', 'command'],
@@ -150,11 +158,16 @@ class McpToolRegistry {
       name: 'list_port_forwards',
       description: 'List saved SSH port-forwarding rules from unlocked vaults.',
       tier: McpPermissionTier.discover,
-      inputSchema: {'type': 'object', 'properties': {}, 'additionalProperties': false},
+      inputSchema: {
+        'type': 'object',
+        'properties': {},
+        'additionalProperties': false,
+      },
     ),
     _ToolSpec(
       name: 'create_port_forward',
-      description: 'Create and save an SSH port-forwarding rule (local, remote, or dynamic SOCKS) for a saved host.',
+      description:
+          'Create and save an SSH port-forwarding rule (local, remote, or dynamic SOCKS) for a saved host.',
       tier: McpPermissionTier.sftpWrite,
       inputSchema: {
         'type': 'object',
@@ -176,11 +189,13 @@ class McpToolRegistry {
           },
           'destHost': {
             'type': 'string',
-            'description': 'Destination host for local/remote forwards (default 127.0.0.1)',
+            'description':
+                'Destination host for local/remote forwards (default 127.0.0.1)',
           },
           'destPort': {
             'type': 'integer',
-            'description': 'Destination port for local/remote forwards (1-65535)',
+            'description':
+                'Destination port for local/remote forwards (1-65535)',
           },
         },
         'required': ['hostId', 'bindPort'],
@@ -273,7 +288,10 @@ class McpToolRegistry {
         'properties': {
           'hostId': {'type': 'string', 'description': 'Target host UUID'},
           'path': {'type': 'string', 'description': 'Remote file path'},
-          'content': {'type': 'string', 'description': 'UTF-8 content to write'},
+          'content': {
+            'type': 'string',
+            'description': 'UTF-8 content to write',
+          },
         },
         'required': ['hostId', 'path', 'content'],
         'additionalProperties': false,
@@ -576,7 +594,10 @@ class McpToolRegistry {
   List<VaultSession> _unlockedVaults() {
     final vaults = vaultsProvider();
     if (vaults.isEmpty) {
-      throw McpToolError('VAULT_LOCKED', 'No unlocked Marsa vault is available.');
+      throw McpToolError(
+        'VAULT_LOCKED',
+        'No unlocked Marsa vault is available.',
+      );
     }
     return vaults;
   }
@@ -595,7 +616,10 @@ class McpToolRegistry {
         return (v, host);
       }
     }
-    throw McpToolError('HOST_NOT_FOUND', 'Host "$hostId" not found in unlocked vaults.');
+    throw McpToolError(
+      'HOST_NOT_FOUND',
+      'Host "$hostId" not found in unlocked vaults.',
+    );
   }
 
   List<Map<String, dynamic>> _discoverHosts(
@@ -864,7 +888,12 @@ class McpToolRegistry {
     final summary = kind == ForwardKind.dynamic
         ? 'Create dynamic SOCKS forward on $bindHost:$bindPort via ${h.title}'
         : 'Create ${kind.name} forward $bindHost:$bindPort -> $destHost:$destPort via ${h.title}';
-    await _requireConsentForTarget(agent, 'create_port_forward', h.title, summary);
+    await _requireConsentForTarget(
+      agent,
+      'create_port_forward',
+      h.title,
+      summary,
+    );
 
     final forward = PortForward(
       label: label,
@@ -899,12 +928,12 @@ class McpToolRegistry {
     String command,
     Map<String, dynamic> args,
   ) async {
-    final timeoutSec = ((args['timeoutSeconds'] as num?)?.toInt() ??
-            defaultTimeoutSeconds)
-        .clamp(1, maxTimeoutSeconds);
-    final maxBytes = ((args['maxOutputBytes'] as num?)?.toInt() ??
-            defaultMaxOutputBytes)
-        .clamp(1024, maxAllowedOutputBytes);
+    final timeoutSec =
+        ((args['timeoutSeconds'] as num?)?.toInt() ?? defaultTimeoutSeconds)
+            .clamp(1, maxTimeoutSeconds);
+    final maxBytes =
+        ((args['maxOutputBytes'] as num?)?.toInt() ?? defaultMaxOutputBytes)
+            .clamp(1024, maxAllowedOutputBytes);
 
     final exec = executions?.start(
       agentId: agent.id,
@@ -943,10 +972,7 @@ class McpToolRegistry {
         var truncated = false;
         final encoded = utf8.encode(out);
         if (encoded.length > maxBytes) {
-          out = utf8.decode(
-            encoded.sublist(0, maxBytes),
-            allowMalformed: true,
-          );
+          out = utf8.decode(encoded.sublist(0, maxBytes), allowMalformed: true);
           truncated = true;
         }
         if (exec != null) {
@@ -1170,7 +1196,8 @@ class McpToolRegistry {
             attr.modifyTime! * 1000,
             isUtc: true,
           ).toIso8601String(),
-        if (attr.mode != null) 'mode': (attr.mode!.value & 0xFFF).toRadixString(8),
+        if (attr.mode != null)
+          'mode': (attr.mode!.value & 0xFFF).toRadixString(8),
       };
     } finally {
       conn.close();
@@ -1183,9 +1210,11 @@ class McpToolRegistry {
     String path,
     Map<String, dynamic> args,
   ) async {
-    final maxBytes = ((args['maxBytes'] as num?)?.toInt() ??
-            defaultMaxOutputBytes)
-        .clamp(1024, maxAllowedOutputBytes);
+    final maxBytes =
+        ((args['maxBytes'] as num?)?.toInt() ?? defaultMaxOutputBytes).clamp(
+          1024,
+          maxAllowedOutputBytes,
+        );
     final conn = await connector(vault, host, _prompter());
     try {
       final sftp = await conn.client.sftp();
@@ -1236,11 +1265,7 @@ class McpToolRegistry {
       final sftp = await conn.client.sftp();
       final files = RemoteFiles(sftp, host.title);
       await files.write(path, Stream<Uint8List>.value(bytes));
-      return {
-        'hostId': host.id,
-        'path': path,
-        'bytesWritten': bytes.length,
-      };
+      return {'hostId': host.id, 'path': path, 'bytesWritten': bytes.length};
     } finally {
       conn.close();
     }
@@ -1274,11 +1299,13 @@ class McpToolRegistry {
     if (!tokenStore.isLocalPathAllowed(agent, localPath)) {
       throw McpToolError(
         'PERMISSION_DENIED',
-        'Local path "$localPath" is not in allowedLocalPaths for agent "${agent.name}".',
+        'Local path "$localPath" is not allowed for agent "${agent.name}". '
+            'Add its folder, or allow all folders, in Settings → MCP → Edit token.',
       );
     }
 
-    final exclude = (args['exclude'] as List?)?.cast<String>() ??
+    final exclude =
+        (args['exclude'] as List?)?.cast<String>() ??
         const ['.git', 'node_modules', '.DS_Store'];
     final options = SyncOptions(
       exclude: exclude,
